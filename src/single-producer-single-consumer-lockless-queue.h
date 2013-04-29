@@ -1,6 +1,7 @@
-// A single-producer single-consumer lockless queue. Lockless
-// queues have the advantage over locking queues in having
-// much lower jitter for queue operations.
+// A single-producer single-consumer lockless queue. Lockless queues have the
+// advantage over locking queues in having much lower jitter for queue
+// operations. Under the hood, the queue uses the C++0x atomic library and
+// acquire-release memory ordering.
 
 #ifndef SINGLE_PRODUCER_SINGLE_CONSUMER_LOCKLESS_QUEUE_H_
 #define SINGLE_PRODUCER_SINGLE_CONSUMER_LOCKLESS_QUEUE_H_
@@ -61,6 +62,7 @@ private:
 	atomic<Node*> last_;
 };
 
+// A convenience macro to keep lines short.
 #define SPSC_LFQ SingleProducerSingleConsumerLockLessQueue
 
 template <typename Value>
@@ -111,6 +113,8 @@ bool SPSC_LFQ<Value>::IsEmpty() const {
 	return divider_.load(memory_order_acquire) !=
 			last_.load(memory_order_acquire);
 }
+
+#undef SPSC_LFQ
 
 }  // lockless
 
