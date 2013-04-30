@@ -39,7 +39,8 @@ public:
 	void Push(Value value);
 
 	// Remove a value from the front of the queue. Call on the consumer thread
-	// only. Returns true iff there was a value to remove.
+	// only. Returns true iff there was a value to remove. Value must not be
+	// null.
 	bool Pop(Value* value);
 
 	// Returns whether the queue is empty or not. Valid on the consumer thread.
