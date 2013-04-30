@@ -1,12 +1,16 @@
 // A single-producer single-consumer lockless queue. Lockless queues have the
 // advantage over locking queues in having much lower jitter for queue
 // operations. Under the hood, the queue uses the C++0x atomic library and
-// acquire-release memory ordering.
+// acquire-release memory ordering. Internally, the queue uses a memory pool
+// to allocate/free memory. If the pool runs out of capacity, it makes
+// a system call under the hood to obtain more.
 
 #ifndef SINGLE_PRODUCER_SINGLE_CONSUMER_LOCKLESS_QUEUE_H_
 #define SINGLE_PRODUCER_SINGLE_CONSUMER_LOCKLESS_QUEUE_H_
 
 #include <atomic>
+
+#include "memory-pool.h"
 
 using std::atomic;
 using std::memory_order_acquire;
@@ -17,7 +21,15 @@ namespace lockless {
 template <typename Value>
 class SingleProducerSingleConsumerLockLessQueue {
 public:
+	static const int kMemoryPoolDefaultCapacity = 16;
+
+	//Use kMemoryPoolDefaultCapacity as the default capacity for the memory
+	// pool.
 	SingleProducerSingleConsumerLockLessQueue();
+
+	// Specify the minimum initial capacity for the memory pool.
+	explicit SingleProducerSingleConsumerLockLessQueue(int initial_capacity);
+
 	~SingleProducerSingleConsumerLockLessQueue();
 
 	// Returns whether this queue is lock free given the type of Value.
@@ -26,7 +38,7 @@ public:
 	// Add a value to the end of the queue. Call on the producer thread only.
 	void Push(Value value);
 
-	// Remove a value to the front of the queue. Call on the consumer thread
+	// Remove a value from the front of the queue. Call on the consumer thread
 	// only. Returns true iff there was a value to remove.
 	bool Pop(Value* value);
 
@@ -35,6 +47,7 @@ public:
 
 private:
 	struct Node {
+		Node(): next(nullptr) {}
 		Node(Value new_value): value(new_value), next(nullptr) {}
 		Value value;
 		Node* next;
@@ -60,37 +73,46 @@ private:
 	Node* first_;
 	atomic<Node*> divider_;
 	atomic<Node*> last_;
+
+	MemoryPool<Node> memory_pool_;
 };
 
 // A convenience macro to keep lines short.
-#define SPSC_LFQ SingleProducerSingleConsumerLockLessQueue
+#define SPSC_LLQ SingleProducerSingleConsumerLockLessQueue
 
 template <typename Value>
-SPSC_LFQ<Value>::SingleProducerSingleConsumerLockLessQueue() {
-	first_ = divider_ = last_ = new Node(Value());
+SPSC_LLQ<Value>::SingleProducerSingleConsumerLockLessQueue() : memory_pool_(
+		kMemoryPoolDefaultCapacity) {
+	first_ = divider_ = last_ = memory_pool_.Allocate();
 }
 
 template <typename Value>
-SPSC_LFQ<Value>::~SingleProducerSingleConsumerLockLessQueue() {
+SPSC_LLQ<Value>::SingleProducerSingleConsumerLockLessQueue(
+		int initial_capacity) : memory_pool_(initial_capacity) {
+	first_ = divider_ = last_ = memory_pool_.Allocate();
+}
+
+template <typename Value>
+SPSC_LLQ<Value>::~SingleProducerSingleConsumerLockLessQueue() {
 	FreeQueueUntil(nullptr);
 }
 
 template <typename Value>
-bool SPSC_LFQ<Value>::IsLockFree() const {
+bool SPSC_LLQ<Value>::IsLockFree() const {
 	return divider_.is_lock_free();
 }
 
 template <typename Value>
-void SPSC_LFQ<Value>::FreeQueueUntil(Node* until_node) {
+void SPSC_LLQ<Value>::FreeQueueUntil(Node* until_node) {
 	while (first_ != until_node) {
 		Node* current = first_;
 		first_ = first_->next;
-		delete current;
+		memory_pool_.Free(current);
 	}
 }
 
 template <typename Value>
-void SPSC_LFQ<Value>::Push(Value value) {
+void SPSC_LLQ<Value>::Push(Value value) {
 	Node* last = last_.load(memory_order_acquire);
 	last->next = new Node(value);
 	last_.store(last->next, memory_order_release);
@@ -98,7 +120,7 @@ void SPSC_LFQ<Value>::Push(Value value) {
 }
 
 template <typename Value>
-bool SPSC_LFQ<Value>::Pop(Value* return_value) {
+bool SPSC_LLQ<Value>::Pop(Value* return_value) {
 	Node* div = divider_.load(memory_order_acquire);
 	if (div != last_.load(memory_order_acquire)) {
 		*return_value = div->next->value;
@@ -109,12 +131,12 @@ bool SPSC_LFQ<Value>::Pop(Value* return_value) {
 }
 
 template <typename Value>
-bool SPSC_LFQ<Value>::IsEmpty() const {
+bool SPSC_LLQ<Value>::IsEmpty() const {
 	return divider_.load(memory_order_acquire) !=
 			last_.load(memory_order_acquire);
 }
 
-#undef SPSC_LFQ
+#undef SPSC_LLQ
 
 }  // lockless
 
