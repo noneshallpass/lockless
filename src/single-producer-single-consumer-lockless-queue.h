@@ -115,7 +115,7 @@ void SPSC_LLQ<Value>::FreeQueueUntil(Node* until_node) {
 template <typename Value>
 void SPSC_LLQ<Value>::Push(Value value) {
 	Node* last = last_.load(memory_order_acquire);
-	last->next = new Node(value);
+	last->next = memory_pool_.Allocate();
 	last_.store(last->next, memory_order_release);
 	FreeQueueUntil(divider_.load(memory_order_acquire));
 }

@@ -12,7 +12,6 @@
 #ifndef MEMORY_POOL_H_
 #define MEMORY_POOL_H_
 
-#include <algorithm>
 #include <list>
 #include <vector>
 
@@ -42,8 +41,7 @@ private:
 template <typename T>
 MemoryPool<T>::MemoryPool(int initial_capacity) {
 	memory_.reserve(initial_capacity);
-	capacity_increment_ = std::max(initial_capacity,
-			static_cast<int>(memory_.capacity()));
+	capacity_increment_ = memory_.capacity();
 	AddCapacity();
 }
 
