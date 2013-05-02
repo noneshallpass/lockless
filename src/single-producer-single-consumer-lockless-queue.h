@@ -115,7 +115,10 @@ void SPSC_LLQ<Value>::FreeQueueUntil(Node* until_node) {
 template <typename Value>
 void SPSC_LLQ<Value>::Push(Value value) {
 	Node* last = last_.load(memory_order_acquire);
-	last->next = memory_pool_.Allocate();
+	Node* new_node = memory_pool_.Allocate();
+	new_node->value = value;
+	new_node->next = nullptr;
+	last->next = new_node;
 	last_.store(last->next, memory_order_release);
 	FreeQueueUntil(divider_.load(memory_order_acquire));
 }
@@ -133,7 +136,7 @@ bool SPSC_LLQ<Value>::Pop(Value* return_value) {
 
 template <typename Value>
 bool SPSC_LLQ<Value>::IsEmpty() const {
-	return divider_.load(memory_order_acquire) !=
+	return divider_.load(memory_order_acquire) ==
 			last_.load(memory_order_acquire);
 }
 

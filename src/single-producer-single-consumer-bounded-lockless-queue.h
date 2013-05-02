@@ -50,7 +50,7 @@ private:
 	void Init();
 
 	// Advance the index by 1 in a circular queue.
-	static int Advance(int index);
+	int Advance(int index) const;
 
 	// The index of the first element in the queue, provided the index is not
 	// equal to the last.
@@ -85,11 +85,12 @@ SPSC_BLLQ<Value>::SingleProducerSingleConsumerBoundedLockLessQueue(
 template <typename Value>
 void SPSC_BLLQ<Value>::Init() {
 	queue_ = new atomic<Value>[capacity_];
-	first_ = last_ = 0;
+	first_ = 0;
+	last_ = capacity_ - 1;
 }
 
 template <typename Value>
-int SPSC_BLLQ<Value>::Advance(int index) {
+int SPSC_BLLQ<Value>::Advance(int index) const {
 	++index;
 	if (index < capacity_) return index;
 	return 0;
@@ -112,10 +113,11 @@ int SPSC_BLLQ<Value>::GetCapacity() const {
 
 template <typename Value>
 bool SPSC_BLLQ<Value>::Push(Value value) {
-	int new_last = Advance(last_.load(memory_order_acquire));
-	if (new_last == first_.load(memory_order_acquire)) {
+	int last = last_.load(memory_order_acquire);
+	if (last == first_.load(memory_order_acquire)) {
 		return false;
 	}
+	int new_last = Advance(last);
 	queue_[new_last].store(value, memory_order_release);
 	last_.store(new_last, memory_order_release);
 	return true;
@@ -124,7 +126,7 @@ bool SPSC_BLLQ<Value>::Push(Value value) {
 template <typename Value>
 bool SPSC_BLLQ<Value>::Pop(Value* return_value) {
 	int first = first_.load(memory_order_acquire);
-	if (first == last_.load(memory_order_acquire)) return false;
+	if (first == Advance(last_.load(memory_order_acquire))) return false;
 	*return_value = queue_[first].load(memory_order_acquire);
 	first_.store(Advance(first), memory_order_release);
 	return true;
@@ -133,7 +135,7 @@ bool SPSC_BLLQ<Value>::Pop(Value* return_value) {
 template <typename Value>
 bool SPSC_BLLQ<Value>::IsEmpty() const {
 	return first_.load(memory_order_acquire) ==
-			last_.load(memory_order_acquire);
+			Advance(last_.load(memory_order_acquire));
 }
 
 #undef SPSC_LLQ
