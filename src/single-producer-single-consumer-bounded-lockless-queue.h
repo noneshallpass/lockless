@@ -22,9 +22,10 @@ public:
 	//Use kDefaultCapacity as the default queue capacity.
 	SingleProducerSingleConsumerBoundedLockLessQueue();
 
-	// Specify the minimum initial capacity for the memory pool.
+	// Specify the memory capacity of the queue. The actual capacity is one
+	// less.
 	explicit SingleProducerSingleConsumerBoundedLockLessQueue(
-			int initial_capacity);
+			int capacity);
 
 	~SingleProducerSingleConsumerBoundedLockLessQueue();
 
@@ -46,21 +47,28 @@ public:
 	// Returns whether the queue is empty or not. Valid on the consumer thread.
 	bool IsEmpty() const;
 
+	// Returns whether the queue is full or not. Valid on the producer thread.
+	bool IsFull() const;
+
 private:
 	void Init();
 
 	// Advance the index by 1 in a circular queue.
 	int Advance(int index) const;
 
-	// The index of the first element in the queue, provided the index is not
-	// equal to the last.
+	// Indexing in the queue works as follows. When the first_ and next_write_
+	// have the same value, the queue is empty. When the next_write_ is one
+	// behind the first_ (modulo the size), then the queue is full. The
+	// actual queue capacity is one less than capacity_: there is an unused
+	// space.
+
+	// The index of the first element in the queue.
 	atomic<int> first_;
 
-	// The index of the last element in the queue. Queue insertion happens at
-	// the next element.
-	atomic<int> last_;
+	// The index of the element one after the last element in the queue.
+	atomic<int> next_write_;
 
-	// The capacity of the queue.
+	// The capacity of the buffer. The actual store capacity is one less.
 	int capacity_;
 
 	// A circular queue.
@@ -78,7 +86,7 @@ SPSC_BLLQ<Value>::SingleProducerSingleConsumerBoundedLockLessQueue() :
 
 template <typename Value>
 SPSC_BLLQ<Value>::SingleProducerSingleConsumerBoundedLockLessQueue(
-		int initial_capacity) : capacity_(initial_capacity) {
+		int capacity) : capacity_(capacity) {
 	Init();
 }
 
@@ -86,7 +94,7 @@ template <typename Value>
 void SPSC_BLLQ<Value>::Init() {
 	queue_ = new atomic<Value>[capacity_];
 	first_ = 0;
-	last_ = capacity_ - 1;
+	next_write_ = 0;
 }
 
 template <typename Value>
@@ -108,25 +116,24 @@ bool SPSC_BLLQ<Value>::IsLockFree() const {
 
 template <typename Value>
 int SPSC_BLLQ<Value>::GetCapacity() const {
-	return capacity_;
+	return capacity_ - 1;
 }
 
 template <typename Value>
 bool SPSC_BLLQ<Value>::Push(Value value) {
-	int last = last_.load(memory_order_acquire);
-	if (last == first_.load(memory_order_acquire)) {
-		return false;
-	}
-	int new_last = Advance(last);
-	queue_[new_last].store(value, memory_order_release);
-	last_.store(new_last, memory_order_release);
-	return true;
+	int first = first_.load(memory_order_acquire);
+	int next_write = next_write_.load(memory_order_acquire);
+	int next_write_next = Advance(next_write);
+	if (first == next_write_next) return false;
+	queue_[next_write].store(value, memory_order_release);
+	next_write_.store(next_write_next, memory_order_release);
 }
 
 template <typename Value>
 bool SPSC_BLLQ<Value>::Pop(Value* return_value) {
 	int first = first_.load(memory_order_acquire);
-	if (first == Advance(last_.load(memory_order_acquire))) return false;
+	int next_write = next_write_.load(memory_order_acquire);
+	if (first == next_write) return false;
 	*return_value = queue_[first].load(memory_order_acquire);
 	first_.store(Advance(first), memory_order_release);
 	return true;
@@ -135,10 +142,16 @@ bool SPSC_BLLQ<Value>::Pop(Value* return_value) {
 template <typename Value>
 bool SPSC_BLLQ<Value>::IsEmpty() const {
 	return first_.load(memory_order_acquire) ==
-			Advance(last_.load(memory_order_acquire));
+			next_write_.load(memory_order_acquire);
 }
 
-#undef SPSC_LLQ
+template <typename Value>
+bool SPSC_BLLQ<Value>::IsFull() const {
+	return first_.load(memory_order_acquire) ==
+			Advance(next_write_.load(memory_order_acquire));
+}
+
+#undef SPSC_BLLQ
 
 }  // lockless
 
