@@ -34,26 +34,28 @@ public:
 
     void TestPushAllThenPop() {
     	int value;
-    	for (int i = 0; i < num_loops_; ++i) {
-    		if (i == 0) {
-    			EXPECT_TRUE(queue_.IsEmpty());
-    		}
-    		queue_.Push(i);
-    		EXPECT_FALSE(queue_.IsEmpty());
-    	}
-    	for (int i = 0; i < num_loops_; ++i) {
-    		value = -1;
-    		EXPECT_TRUE(queue_.Pop(&value));
-    		EXPECT_EQ(i, value);
-    		if (i == num_loops_ - 1) {
-    			EXPECT_TRUE(queue_.IsEmpty());
-    		} else {
+    	for (int k = 0; k < 2; ++k) {
+    		for (int i = 0; i < num_loops_; ++i) {
+    			if (i == 0) {
+    				EXPECT_TRUE(queue_.IsEmpty());
+    			}
+    			queue_.Push(i);
     			EXPECT_FALSE(queue_.IsEmpty());
     		}
+    		for (int i = 0; i < num_loops_; ++i) {
+    			value = -1;
+    			EXPECT_TRUE(queue_.Pop(&value));
+    			EXPECT_EQ(i, value);
+    			if (i == num_loops_ - 1) {
+    				EXPECT_TRUE(queue_.IsEmpty());
+    			} else {
+    				EXPECT_FALSE(queue_.IsEmpty());
+    			}
+    		}
+    		// Cannot pop from an empty queue.
+    		value = -1;
+    		EXPECT_FALSE(queue_.Pop(&value));
     	}
-    	// Cannot pop from an empty queue.
-    	value = -1;
-    	EXPECT_FALSE(queue_.Pop(&value));
     }
 
     void TestPushTwicePerPop() {

@@ -24,8 +24,7 @@ public:
 
 	// Specify the memory capacity of the queue. The actual capacity is one
 	// less.
-	explicit SingleProducerSingleConsumerBoundedLockLessQueue(
-			int capacity);
+	explicit SingleProducerSingleConsumerBoundedLockLessQueue(int capacity);
 
 	~SingleProducerSingleConsumerBoundedLockLessQueue();
 
@@ -156,4 +155,3 @@ bool SPSC_BLLQ<Value>::IsFull() const {
 }  // lockless
 
 #endif  // SINGLE_PRODUCER_SINGLE_CONSUMER_BOUNDED_LOCKLESS_QUEUE_H_
-
