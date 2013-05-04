@@ -127,7 +127,7 @@ public:
 	SPSCLocklessQueueBenchMarkTest() {}
 };
 
-BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, UnBoundedLockLessRandomData, 10, 1) {
+BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, UnBoundedLockLessRandomData, 50, 1) {
 	SPSCLockLessQueueTest queue;
 	thread push_thread(&SPSCLockLessQueueTest::RandomPush, &queue);
 	thread pop_thread(&SPSCLockLessQueueTest::RandomPop, &queue);
@@ -136,7 +136,7 @@ BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, UnBoundedLockLessRandomData, 10, 1) 
 	assert(queue.push_count_ == queue.pop_count_);
 }
 
-BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, BoundedLockLessRandomData, 10, 1) {
+BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, BoundedLockLessRandomData, 50, 1) {
 	unique_ptr<SPSCBoundedLockLessQueueTest> queue(new SPSCBoundedLockLessQueueTest(32));
 	thread push_thread(&SPSCBoundedLockLessQueueTest::RandomPushWithSpin, queue.get());
 	thread pop_thread(&SPSCBoundedLockLessQueueTest::RandomPop, queue.get());
@@ -145,7 +145,7 @@ BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, BoundedLockLessRandomData, 10, 1) {
 	assert(queue->push_count_ == queue->pop_count_);
 }
 
-BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, LockingRandomData, 10, 1) {
+BENCHMARK_F(SPSCLocklessQueueBenchMarkTest, LockingRandomData, 50, 1) {
 	LockingQueueTest queue;
 	thread push_thread(&LockingQueueTest::RandomPush, &queue);
 	thread pop_thread(&LockingQueueTest::RandomPop, &queue);
