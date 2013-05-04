@@ -11,6 +11,7 @@
 using std::atomic;
 using std::memory_order_acquire;
 using std::memory_order_release;
+using std::memory_order_seq_cst;
 
 namespace lockless {
 
@@ -92,8 +93,8 @@ SPSC_BLLQ<Value>::SingleProducerSingleConsumerBoundedLockLessQueue(
 template <typename Value>
 void SPSC_BLLQ<Value>::Init() {
 	queue_ = new atomic<Value>[capacity_];
-	first_ = 0;
-	next_write_ = 0;
+	first_.store(0, memory_order_seq_cst);
+	next_write_.store(0, memory_order_seq_cst);
 }
 
 template <typename Value>
@@ -126,6 +127,7 @@ bool SPSC_BLLQ<Value>::Push(Value value) {
 	if (first == next_write_next) return false;
 	queue_[next_write].store(value, memory_order_release);
 	next_write_.store(next_write_next, memory_order_release);
+	return true;
 }
 
 template <typename Value>
